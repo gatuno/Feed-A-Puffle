@@ -65,9 +65,17 @@ const char *images_names[NUM_IMAGES] = {
 
 /* TODO: Listar aquí los automátas */
 
+/* Codigos de salida */
+enum {
+	GAME_NONE = 0, /* No usado */
+	GAME_CONTINUE,
+	GAME_QUIT
+};
+
 /* Estructuras */
 
 /* Prototipos de función */
+int game_loop (void);
 void setup (void);
 SDL_Surface * set_video_mode(unsigned flags);
 
@@ -76,15 +84,69 @@ SDL_Surface * screen;
 SDL_Surface * images [NUM_IMAGES];
 
 int main (int argc, char *argv[]) {
-	SDL_Event evento;
 	
 	setup ();
 	
 	do {
-		SDL_WaitEvent (&evento);
-	} while (evento.type != SDL_QUIT);
+		if (game_loop () == GAME_QUIT) break;
+	} while (1 == 0);
 	
-	return 0;
+	SDL_Quit ();
+	return EXIT_SUCCESS;
+}
+
+int game_loop (void) {
+	int done = 0;
+	SDL_Event event;
+	SDLKey key;
+	Uint32 last_time, now_time;
+	SDL_Rect rect;
+	
+	do {
+		last_time = SDL_GetTicks ();
+		
+		while (SDL_PollEvent(&event) > 0) {
+			switch (event.type) {
+				case SDL_QUIT:
+					/* Vamos a cerrar la aplicación */
+					done = GAME_QUIT;
+					break;
+			}
+		}
+		
+		/* Dibujar el escenario */
+		rect.x = -6;
+		rect.y = -1;
+		rect.h = images[IMG_ROW_4]->h; rect.w = images[IMG_ROW_4]->w;
+		
+		SDL_BlitSurface (images [IMG_ROW_4], NULL, screen, &rect);
+		
+		rect.x = -5;
+		rect.y = 179;
+		rect.h = images[IMG_ROW_3]->h; rect.w = images[IMG_ROW_3]->w;
+		
+		SDL_BlitSurface (images [IMG_ROW_3], NULL, screen, &rect);
+		
+		rect.x = -5;
+		rect.y = 262;
+		rect.h = images[IMG_ROW_2]->h; rect.w = images[IMG_ROW_2]->w;
+		
+		SDL_BlitSurface (images [IMG_ROW_2], NULL, screen, &rect);
+		
+		rect.x = -5;
+		rect.y = 398;
+		rect.h = images[IMG_ROW_1]->h; rect.w = images[IMG_ROW_1]->w;
+		
+		SDL_BlitSurface (images [IMG_ROW_1], NULL, screen, &rect);
+		
+		SDL_Flip (screen);
+		
+		now_time = SDL_GetTicks ();
+		if (now_time < last_time + FPS) SDL_Delay(last_time + FPS - now_time);
+		
+	} while (!done);
+	
+	return done;
 }
 
 /* Set video mode: */
