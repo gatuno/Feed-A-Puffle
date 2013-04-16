@@ -73,6 +73,18 @@ enum {
 };
 
 /* Estructuras */
+typedef struct _PuffleO {
+	struct _PuffleO *next;
+	struct _PuffleO *prev;
+	int x, y;
+	int z;
+	int frame;
+	int fuerzax, fuerzay;
+	int scalex, scaley;
+	int holderay, holderaz;
+	int holderby, holderbz;
+	int holdercy, holdercz;
+} PuffleO;
 
 /* Prototipos de función */
 int game_loop (void);
@@ -102,6 +114,17 @@ int game_loop (void) {
 	Uint32 last_time, now_time;
 	SDL_Rect rect;
 	
+	int handposx2, handposx1, handposx, handposy2, handposy1, handposy; /* Para calcular los desplazamientos del mouse */
+	int fuerzax, fuerzay;
+	int totalpuffleos = 100;
+	int launcher_x, launcher_y;
+	
+	SDL_EventState (SDL_MOUSEMOTION, SDL_IGNORE);
+	SDL_GetMouseState (&handposx, &handposy);
+	
+	launcher_x = handposx2 = handposx1 = handposx;
+	launcher_y = handposy2 = handposy1 = handposy;
+	
 	do {
 		last_time = SDL_GetTicks ();
 		
@@ -113,9 +136,33 @@ int game_loop (void) {
 					break;
 			}
 		}
+		/* TODO: Stamp unlocked */
+		handposy2 = handposy1;
+		handposy1 = handposy;
+		
+		handposx2 = handposx1;
+		handposx1 = handposx;
+		
+		SDL_GetMouseState (&handposx, &handposy);
+		
+		fuerzay = (handposy2 - handposy + 60) / 3;
+		if (fuerzay > 40) {
+			fuerzay = 40;
+		} else if (fuerzay < -20) {
+			fuerzay = -20;
+		}
+		
+		fuerzax = (handposx2 -handposx) / 3;
+		if (fuerzax > 30) {
+			fuerzax = 30;
+		} else if (fuerzax < -30) {
+			fuerzax = -30;
+		}
+		
+		/* TODO: Actualizar los valores del launcher */
 		
 		/* Dibujar el escenario */
-		rect.x = -6;
+		rect.x = -7;
 		rect.y = -1;
 		rect.h = images[IMG_ROW_4]->h; rect.w = images[IMG_ROW_4]->w;
 		
@@ -138,6 +185,7 @@ int game_loop (void) {
 		rect.h = images[IMG_ROW_1]->h; rect.w = images[IMG_ROW_1]->w;
 		
 		SDL_BlitSurface (images [IMG_ROW_1], NULL, screen, &rect);
+		
 		
 		SDL_Flip (screen);
 		
