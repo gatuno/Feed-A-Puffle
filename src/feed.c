@@ -36,9 +36,19 @@
 #include <SDL.h>
 #include <SDL_image.h>
 
-/*#include "config.h"*/
+#include "config.h"
 
 #define FPS (1000/24)
+
+#define SWAP(a, b, t) ((t) = (a), (a) = (b), (b) = (t))
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+
+#ifndef TRUE
+#define TRUE !FALSE
+#endif
 
 /* Enumerar las imágenes */
 enum {
@@ -49,10 +59,12 @@ enum {
 	IMG_ROW_3,
 	IMG_ROW_4,
 	
+	IMG_PUFFLEO_1,
+	IMG_PUFFLEO_2,
+	IMG_PUFFLEO_3,
+	
 	NUM_IMAGES
 };
-
-#define GAMEDATA_DIR "../data/"
 
 const char *images_names[NUM_IMAGES] = {
 	GAMEDATA_DIR "images/interface.png",
@@ -60,7 +72,11 @@ const char *images_names[NUM_IMAGES] = {
 	GAMEDATA_DIR "images/row1.png",
 	GAMEDATA_DIR "images/row2.png",
 	GAMEDATA_DIR "images/row3.png",
-	GAMEDATA_DIR "images/row4.png"
+	GAMEDATA_DIR "images/row4.png",
+	
+	GAMEDATA_DIR "images/puffleo1.png",
+	GAMEDATA_DIR "images/puffleo2.png",
+	GAMEDATA_DIR "images/puffleo3.png"
 };
 
 /* TODO: Listar aquí los automátas */
@@ -80,7 +96,7 @@ typedef struct _PuffleO {
 	int z;
 	int frame;
 	int fuerzax, fuerzay;
-	int scalex, scaley;
+	int scale;
 	int holderay, holderaz;
 	int holderby, holderbz;
 	int holdercy, holdercz;
@@ -89,11 +105,16 @@ typedef struct _PuffleO {
 /* Prototipos de función */
 int game_loop (void);
 void setup (void);
-SDL_Surface * set_video_mode(unsigned flags);
+SDL_Surface * set_video_mode(unsigned);
+void lanzar_puffleO (int, int, int, int);
+void eliminar_puffleO (PuffleO *);
 
 /* Variables globales */
 SDL_Surface * screen;
 SDL_Surface * images [NUM_IMAGES];
+PuffleO * first_puffleO = NULL;
+PuffleO * last_puffleO = NULL;
+int n_puffleOs = 1;
 
 int main (int argc, char *argv[]) {
 	
@@ -118,6 +139,9 @@ int game_loop (void) {
 	int fuerzax, fuerzay;
 	int totalpuffleos = 100;
 	int launcher_x, launcher_y;
+	PuffleO * this_puffleO;
+	int mouseisdown = FALSE;
+	int mouseisready = TRUE;
 	
 	SDL_EventState (SDL_MOUSEMOTION, SDL_IGNORE);
 	SDL_GetMouseState (&handposx, &handposy);
@@ -134,9 +158,20 @@ int game_loop (void) {
 					/* Vamos a cerrar la aplicación */
 					done = GAME_QUIT;
 					break;
+				case SDL_MOUSEBUTTONDOWN:
+					/* Lanzar un puffle O */
+					/* Si el mouse no entra dentro de los botones, lanzar un puffleO */
+					mouseisdown = TRUE;
+					break;
+				case SDL_MOUSEBUTTONUP:
+					mouseisdown = FALSE;
+					break;
 			}
 		}
 		/* TODO: Stamp unlocked */
+		
+		/* TODO: Contador / timer generador de puffles */
+		
 		handposy2 = handposy1;
 		handposy1 = handposy;
 		
@@ -152,7 +187,7 @@ int game_loop (void) {
 			fuerzay = -20;
 		}
 		
-		fuerzax = (handposx2 -handposx) / 3;
+		fuerzax = (handposx2 - handposx) / 3;
 		if (fuerzax > 30) {
 			fuerzax = 30;
 		} else if (fuerzax < -30) {
@@ -161,31 +196,140 @@ int game_loop (void) {
 		
 		/* TODO: Actualizar los valores del launcher */
 		
+		if (mouseisready) {
+			if (mouseisdown) {
+				if (totalpuffleos > 0) {
+					totalpuffleos--;
+				}
+				mouseisready = FALSE;
+				lanzar_puffleO (handposx, handposy, fuerzax, fuerzay);
+			}
+		}
+		
+		if (!mouseisdown) mouseisready = TRUE;
+		
+		/* Recorrer y animar todos los PuffleOs */
+		this_puffleO = first_puffleO;
+		while (this_puffleO != NULL) {
+			printf ("Debug: fuerza X: %i\n", this_puffleO->fuerzax);
+			this_puffleO->scale = 30 + this_puffleO->y / 3;
+			
+			if (this_puffleO->scale < 50) {
+				this_puffleO->scale = 50;
+			} else if (this_puffleO->scale > 180) {
+				this_puffleO->scale = 180;
+			}
+			
+			this_puffleO->x -= this_puffleO->fuerzax;
+			this_puffleO->y -= this_puffleO->fuerzay;
+			this_puffleO->fuerzay--;
+			
+			/* Recorrer los 4 agujeros de la fila superior, para darles de comer */
+			if (this_puffleO->y < this_puffleO->holderay - 10 && this_puffleO->z > this_puffleO->holderaz) {
+				/* Recorrer los 4 y darles de comer */
+			} else if (this_puffleO->y > this_puffleO->holderay - 20 && this_puffleO->z < this_puffleO->holderaz) {
+				/* Golpeo contra los puffles */
+			}
+			
+			if (this_puffleO->z < this_puffleO->holderaz && this_puffleO->y > 430) {
+				if (this_puffleO->prev != NULL) {
+					this_puffleO = this_puffleO->prev;
+					eliminar_puffleO (this_puffleO->next);
+				} else {
+					eliminar_puffleO (this_puffleO);
+					this_puffleO = first_puffleO;
+				}
+				continue;
+			}
+			if (this_puffleO->z < this_puffleO->holderbz && this_puffleO->y > 288) {
+				if (this_puffleO->prev != NULL) {
+					this_puffleO = this_puffleO->prev;
+					eliminar_puffleO (this_puffleO->next);
+				} else {
+					eliminar_puffleO (this_puffleO);
+					this_puffleO = first_puffleO;
+				}
+				continue;
+			}
+			if (this_puffleO->z < this_puffleO->holdercz && this_puffleO->y > 198) {
+				if (this_puffleO->prev != NULL) {
+					this_puffleO = this_puffleO->prev;
+					eliminar_puffleO (this_puffleO->next);
+				} else {
+					eliminar_puffleO (this_puffleO);
+					this_puffleO = first_puffleO;
+				}
+				continue;
+			}
+			if (this_puffleO != NULL) this_puffleO = this_puffleO->next;
+		}
+		
 		/* Dibujar el escenario */
+		/* Row 4 tiene la menor profundidad, dibujar primero */
+		/* Z = 100 */
 		rect.x = -7;
 		rect.y = -1;
 		rect.h = images[IMG_ROW_4]->h; rect.w = images[IMG_ROW_4]->w;
 		
 		SDL_BlitSurface (images [IMG_ROW_4], NULL, screen, &rect);
 		
+		for (this_puffleO = first_puffleO; this_puffleO != NULL; this_puffleO = this_puffleO->next) {
+			if (this_puffleO->z > 100 && this_puffleO->z < 300) {
+				rect.x = this_puffleO->x;
+				rect.y = this_puffleO->y;
+				rect.h = images[this_puffleO->frame]->h; rect.w = images[this_puffleO->frame]->w;
+				SDL_BlitSurface (images[this_puffleO->frame], NULL, screen, &rect);
+			}
+		}
+		
+		/* Z = 300 */
 		rect.x = -5;
 		rect.y = 179;
 		rect.h = images[IMG_ROW_3]->h; rect.w = images[IMG_ROW_3]->w;
 		
 		SDL_BlitSurface (images [IMG_ROW_3], NULL, screen, &rect);
 		
+		for (this_puffleO = first_puffleO; this_puffleO != NULL; this_puffleO = this_puffleO->next) {
+			if (this_puffleO->z > 300 && this_puffleO->z < 500) {
+				rect.x = this_puffleO->x;
+				rect.y = this_puffleO->y;
+				rect.h = images[this_puffleO->frame]->h; rect.w = images[this_puffleO->frame]->w;
+				SDL_BlitSurface (images[this_puffleO->frame], NULL, screen, &rect);
+			}
+		}
+		
+		/* Z = 500 */
 		rect.x = -5;
 		rect.y = 262;
 		rect.h = images[IMG_ROW_2]->h; rect.w = images[IMG_ROW_2]->w;
 		
 		SDL_BlitSurface (images [IMG_ROW_2], NULL, screen, &rect);
 		
+		for (this_puffleO = first_puffleO; this_puffleO != NULL; this_puffleO = this_puffleO->next) {
+			if (this_puffleO->z > 500 && this_puffleO->z < 700) {
+				rect.x = this_puffleO->x;
+				rect.y = this_puffleO->y;
+				rect.h = images[this_puffleO->frame]->h; rect.w = images[this_puffleO->frame]->w;
+				SDL_BlitSurface (images[this_puffleO->frame], NULL, screen, &rect);
+			}
+		}
+		
+		/* Row 1 tien la mayor profundidad, debe ir encima de todo */
+		/* Z = 700 */
 		rect.x = -5;
 		rect.y = 398;
 		rect.h = images[IMG_ROW_1]->h; rect.w = images[IMG_ROW_1]->w;
 		
 		SDL_BlitSurface (images [IMG_ROW_1], NULL, screen, &rect);
 		
+		for (this_puffleO = first_puffleO; this_puffleO != NULL; this_puffleO = this_puffleO->next) {
+			if (this_puffleO->z > 700) {
+				rect.x = this_puffleO->x;
+				rect.y = this_puffleO->y;
+				rect.h = images[this_puffleO->frame]->h; rect.w = images[this_puffleO->frame]->w;
+				SDL_BlitSurface (images[this_puffleO->frame], NULL, screen, &rect);
+			}
+		}
 		
 		SDL_Flip (screen);
 		
@@ -250,4 +394,80 @@ void setup (void) {
 	}
 	
 	srand (SDL_GetTicks ());
+}
+
+void lanzar_puffleO (int x, int y, int fuerzax, int fuerzay) {
+	PuffleO *nuevo;
+	int t;
+	
+	nuevo = (PuffleO *) malloc (sizeof (PuffleO));
+	
+	/* Inicializar este puffle O */
+	nuevo->z = 700 + n_puffleOs;
+	nuevo->x = x;
+	nuevo->y = y;
+	nuevo->frame = IMG_PUFFLEO_1 + (int) (3.0 * rand () / (RAND_MAX + 1.0));
+	printf ("Debug: frame: %i\n", nuevo->frame);
+	printf ("Debug: fuerza X: %i\n", fuerzax);
+	nuevo->frame = IMG_PUFFLEO_1;
+	nuevo->fuerzax = fuerzax;
+	nuevo->fuerzay = fuerzay;
+	
+	nuevo->holderaz = 500 + n_puffleOs;
+	nuevo->holderbz = 300 + n_puffleOs;
+	nuevo->holdercz = 100 + n_puffleOs;
+	
+	nuevo->holderay = 380;
+	nuevo->holderby = 245;
+	nuevo->holdercy = 172;
+	
+	if (nuevo->y < nuevo->holderay && nuevo->z > nuevo->holderaz) {
+		SWAP (nuevo->z, nuevo->holderaz, t);
+	} else if (nuevo->y > nuevo->holderay && nuevo->z < nuevo->holderaz) {
+		SWAP (nuevo->z, nuevo->holderaz, t);
+	}
+	
+	if (nuevo->y < nuevo->holderby && nuevo->z > nuevo->holderbz) {
+		SWAP (nuevo->z, nuevo->holderbz, t);
+	} else if (nuevo->y > nuevo->holderby && nuevo->z < nuevo->holderbz) {
+		SWAP (nuevo->z, nuevo->holderbz, t);
+	}
+	
+	if (nuevo->y < nuevo->holdercy && nuevo->z > nuevo->holdercz) {
+		SWAP (nuevo->z, nuevo->holdercz, t);
+	} else if (nuevo->y > nuevo->holdercy && nuevo->z < nuevo->holdercz) {
+		SWAP (nuevo->z, nuevo->holdercz, t);
+	}
+	
+	n_puffleOs++;
+	if (n_puffleOs > 40) n_puffleOs = 1;
+	
+	/* Ahora los campos de la lista doble ligada */
+	nuevo->next = NULL;
+	nuevo->prev = last_puffleO;
+	
+	if (last_puffleO == NULL) {
+		first_puffleO = last_puffleO = nuevo;
+	} else {
+		last_puffleO->next = nuevo;
+		last_puffleO = nuevo;
+	}
+}
+
+void eliminar_puffleO (PuffleO *p) {
+	if (p == NULL) return;
+	
+	if (p->prev == NULL) { /* El primero de la lista */
+		first_puffleO = p->next;
+	} else {
+		p->prev->next = p->next;
+	}
+	
+	if (p->next == NULL) {
+		last_puffleO = p->prev;
+	} else {
+		p->next->prev = p->prev;
+	}
+	
+	free (p);
 }
